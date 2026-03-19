@@ -9,22 +9,21 @@ import (
 )
 
 // RunAllTests discovers test suites under rootDir and runs each test case
-// as a Go subtest against HEAD (library), stable, and eol (binaries built
-// from the two most recent upstream tags).
+// as a Go subtest against HEAD (library), stable, and eol (downloaded or
+// built from the two most recent upstream tags).
 func RunAllTests(t *testing.T, rootDir string) {
 	t.Helper()
 
 	runners := []VersionRunner{&HeadRunner{}}
 
-	builds, err := BuildAmpelVersions()
+	bins, err := GetAmpelBinaries()
 	if err != nil {
-		t.Logf("WARNING: could not build versioned ampel binaries: %v", err)
-		t.Log("Running HEAD only. Set AMPEL_STABLE_BIN / AMPEL_EOL_BIN to provide binaries manually.")
+		t.Logf("could not get versioned ampel binaries, running HEAD only: %v", err)
 	} else {
-		t.Cleanup(builds.Cleanup)
+		t.Cleanup(bins.Cleanup)
 		runners = append(runners,
-			&BinaryRunner{Name: "stable", BinaryPath: builds.Stable},
-			&BinaryRunner{Name: "eol", BinaryPath: builds.EOL},
+			&BinaryRunner{Name: "stable (" + bins.StableTag + ")", BinaryPath: bins.Stable},
+			&BinaryRunner{Name: "eol (" + bins.EOLTag + ")", BinaryPath: bins.EOL},
 		)
 	}
 

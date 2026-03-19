@@ -8,146 +8,185 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 
 	"golang.org/x/mod/semver"
 )
 
-const defaultAmpelRepo = "https://github.com/carabiner-dev/ampel.git"
+const (
+	defaultAmpelRepo  = "https://github.com/carabiner-dev/ampel.git"
+	defaultAmpelOwner = "carabiner-dev"
+	defaultAmpelName  = "ampel"
+)
 
-// AmpelBuilds holds the paths to ampel binaries built from specific tags.
-type AmpelBuilds struct {
-	// Stable is the binary built from the latest stable tag.
+// AmpelBinaries holds the paths to ampel binaries for specific versions.
+type AmpelBinaries struct {
+	// Stable is the binary for the latest stable tag.
 	Stable string
-	// EOL is the binary built from the second-latest stable tag.
+	// StableTag is the tag used for the stable binary.
+	StableTag string
+	// EOL is the binary for the second-latest stable tag.
 	EOL string
-	// dir is the temp directory holding the clone and binaries.
+	// EOLTag is the tag used for the eol binary.
+	EOLTag string
+	// dir is the temp directory holding the binaries.
 	dir string
 }
 
-// Cleanup removes the temporary directory with the clone and binaries.
-func (b *AmpelBuilds) Cleanup() {
+// Cleanup removes the temporary directory with the binaries.
+func (b *AmpelBinaries) Cleanup() {
 	if b.dir != "" {
 		os.RemoveAll(b.dir)
 	}
 }
 
-// BuildAmpelVersions clones the ampel repo, finds the two most recent stable
-// tags, and builds a binary from each. Returns the paths to both binaries.
-// Call Cleanup() on the result when done.
-func BuildAmpelVersions() (*AmpelBuilds, error) {
-	return BuildAmpelVersionsFrom(defaultAmpelRepo)
-}
-
-// BuildAmpelVersionsFrom is like BuildAmpelVersions but clones from a custom
-// repo URL or local path.
-func BuildAmpelVersionsFrom(repo string) (*AmpelBuilds, error) {
-	dir, err := os.MkdirTemp("", "lexecutor-ampel-*")
+// GetAmpelBinaries fetches ampel binaries for the two most recent stable tags.
+// It downloads pre-built binaries from GitHub releases. If that fails, it
+// falls back to cloning and building from source.
+func GetAmpelBinaries() (*AmpelBinaries, error) {
+	tags, err := listReleaseTags()
 	if err != nil {
-		return nil, fmt.Errorf("creating temp dir: %w", err)
-	}
-
-	builds := &AmpelBuilds{dir: dir}
-
-	cloneDir := filepath.Join(dir, "ampel")
-	binDir := filepath.Join(dir, "bin")
-	if err := os.MkdirAll(binDir, 0o755); err != nil {
-		builds.Cleanup()
-		return nil, err
-	}
-
-	// Clone the repo
-	if err := run(dir, "git", "clone", "--quiet", repo, cloneDir); err != nil {
-		builds.Cleanup()
-		return nil, fmt.Errorf("cloning ampel: %w", err)
-	}
-
-	// List tags and find the two most recent stable ones
-	tags, err := listStableTags(cloneDir)
-	if err != nil {
-		builds.Cleanup()
-		return nil, err
+		return nil, fmt.Errorf("listing release tags: %w", err)
 	}
 	if len(tags) < 2 {
-		builds.Cleanup()
-		return nil, fmt.Errorf("need at least 2 stable tags, found %d", len(tags))
+		return nil, fmt.Errorf("need at least 2 stable releases, found %d", len(tags))
 	}
 
 	stableTag := tags[0]
 	eolTag := tags[1]
 
-	// Build stable binary
-	stableBin := filepath.Join(binDir, "ampel-stable")
-	if err := buildAtTag(cloneDir, stableTag, stableBin); err != nil {
-		builds.Cleanup()
-		return nil, fmt.Errorf("building stable (%s): %w", stableTag, err)
+	dir, err := os.MkdirTemp("", "lexecutor-ampel-*")
+	if err != nil {
+		return nil, fmt.Errorf("creating temp dir: %w", err)
 	}
-	builds.Stable = stableBin
+	bins := &AmpelBinaries{dir: dir, StableTag: stableTag, EOLTag: eolTag}
 
-	// Build eol binary
-	eolBin := filepath.Join(binDir, "ampel-eol")
-	if err := buildAtTag(cloneDir, eolTag, eolBin); err != nil {
-		builds.Cleanup()
-		return nil, fmt.Errorf("building eol (%s): %w", eolTag, err)
+	// Try downloading pre-built binaries
+	stableBin := filepath.Join(dir, "ampel-stable")
+	if err := downloadReleaseBinary(stableTag, stableBin); err != nil {
+		bins.Cleanup()
+		return buildAmpelBinaries(stableTag, eolTag)
 	}
-	builds.EOL = eolBin
+	bins.Stable = stableBin
 
-	return builds, nil
+	eolBin := filepath.Join(dir, "ampel-eol")
+	if err := downloadReleaseBinary(eolTag, eolBin); err != nil {
+		bins.Cleanup()
+		return buildAmpelBinaries(stableTag, eolTag)
+	}
+	bins.EOL = eolBin
+
+	return bins, nil
 }
 
-// listStableTags returns stable semver tags (vX.Y.Z, no pre-release) sorted
-// descending. At least 2 are required.
-func listStableTags(repoDir string) ([]string, error) {
-	out, err := output(repoDir, "git", "tag", "--list", "v*")
+// listReleaseTags uses gh CLI to list stable release tags, sorted descending.
+func listReleaseTags() ([]string, error) {
+	out, err := exec.Command(
+		"gh", "release", "list",
+		"-R", defaultAmpelOwner+"/"+defaultAmpelName,
+		"--exclude-drafts", "--exclude-pre-releases",
+		"--json", "tagName",
+		"--jq", ".[].tagName",
+	).Output()
 	if err != nil {
-		return nil, fmt.Errorf("listing tags: %w", err)
+		return nil, fmt.Errorf("gh release list: %w", err)
 	}
 
 	var tags []string
-	for _, line := range strings.Split(strings.TrimSpace(out), "\n") {
+	for _, line := range strings.Split(strings.TrimSpace(string(out)), "\n") {
 		tag := strings.TrimSpace(line)
-		if tag == "" {
-			continue
+		if tag != "" && semver.IsValid(tag) {
+			tags = append(tags, tag)
 		}
-		// Only stable releases: vX.Y.Z with no pre-release suffix
-		if !semver.IsValid(tag) {
-			continue
-		}
-		if semver.Prerelease(tag) != "" {
-			continue
-		}
-		tags = append(tags, tag)
 	}
 
 	sort.Slice(tags, func(i, j int) bool {
-		return semver.Compare(tags[i], tags[j]) > 0 // descending
+		return semver.Compare(tags[i], tags[j]) > 0
 	})
-
 	return tags, nil
+}
+
+// downloadReleaseBinary downloads the ampel binary for the given tag using gh.
+func downloadReleaseBinary(tag, outputPath string) error {
+	assetName := fmt.Sprintf("ampel-%s-%s-%s", tag, runtime.GOOS, runtime.GOARCH)
+
+	tmpDir, err := os.MkdirTemp("", "lexecutor-dl-*")
+	if err != nil {
+		return err
+	}
+	defer os.RemoveAll(tmpDir)
+
+	cmd := exec.Command(
+		"gh", "release", "download", tag,
+		"-R", defaultAmpelOwner+"/"+defaultAmpelName,
+		"-p", assetName,
+		"-D", tmpDir,
+	)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("%w: %s", err, strings.TrimSpace(string(out)))
+	}
+
+	downloaded := filepath.Join(tmpDir, assetName)
+	if err := os.Chmod(downloaded, 0o755); err != nil {
+		return err
+	}
+
+	return os.Rename(downloaded, outputPath)
+}
+
+// buildAmpelBinaries clones the repo and builds binaries from the given tags.
+func buildAmpelBinaries(stableTag, eolTag string) (*AmpelBinaries, error) {
+	dir, err := os.MkdirTemp("", "lexecutor-ampel-*")
+	if err != nil {
+		return nil, fmt.Errorf("creating temp dir: %w", err)
+	}
+
+	bins := &AmpelBinaries{dir: dir, StableTag: stableTag, EOLTag: eolTag}
+	cloneDir := filepath.Join(dir, "ampel")
+	binDir := filepath.Join(dir, "bin")
+	if err := os.MkdirAll(binDir, 0o755); err != nil {
+		bins.Cleanup()
+		return nil, err
+	}
+
+	if err := runCmd(dir, "git", "clone", "--quiet", defaultAmpelRepo, cloneDir); err != nil {
+		bins.Cleanup()
+		return nil, fmt.Errorf("cloning ampel: %w", err)
+	}
+
+	stableBin := filepath.Join(binDir, "ampel-stable")
+	if err := buildAtTag(cloneDir, stableTag, stableBin); err != nil {
+		bins.Cleanup()
+		return nil, fmt.Errorf("building stable (%s): %w", stableTag, err)
+	}
+	bins.Stable = stableBin
+
+	eolBin := filepath.Join(binDir, "ampel-eol")
+	if err := buildAtTag(cloneDir, eolTag, eolBin); err != nil {
+		bins.Cleanup()
+		return nil, fmt.Errorf("building eol (%s): %w", eolTag, err)
+	}
+	bins.EOL = eolBin
+
+	return bins, nil
 }
 
 // buildAtTag checks out a tag and builds the ampel binary.
 func buildAtTag(repoDir, tag, outputPath string) error {
-	if err := run(repoDir, "git", "checkout", "--quiet", tag); err != nil {
+	if err := runCmd(repoDir, "git", "checkout", "--quiet", tag); err != nil {
 		return fmt.Errorf("checking out %s: %w", tag, err)
 	}
-	if err := run(repoDir, "go", "build", "-o", outputPath, "./cmd/ampel"); err != nil {
+	if err := runCmd(repoDir, "go", "build", "-o", outputPath, "./cmd/ampel"); err != nil {
 		return fmt.Errorf("building at %s: %w", tag, err)
 	}
 	return nil
 }
 
-func run(dir string, name string, args ...string) error {
+func runCmd(dir string, name string, args ...string) error {
 	cmd := exec.Command(name, args...)
 	cmd.Dir = dir
 	cmd.Stderr = os.Stderr
 	return cmd.Run()
-}
-
-func output(dir string, name string, args ...string) (string, error) {
-	cmd := exec.Command(name, args...)
-	cmd.Dir = dir
-	out, err := cmd.Output()
-	return string(out), err
 }
