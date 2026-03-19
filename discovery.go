@@ -16,7 +16,7 @@ type DiscoveredSuite struct {
 	Suite *tester.TestSuite // parsed config
 }
 
-// Discover walks rootDir looking for .ampel-tests.yaml files and returns
+// Discover walks rootDir looking for .ptests.yaml files and returns
 // the parsed suites.
 func Discover(rootDir string) ([]DiscoveredSuite, error) {
 	var suites []DiscoveredSuite
@@ -28,7 +28,7 @@ func Discover(rootDir string) ([]DiscoveredSuite, error) {
 		if d.IsDir() {
 			return nil
 		}
-		if d.Name() != ".ampel-tests.yaml" {
+		if d.Name() != ".ptests.yaml" {
 			return nil
 		}
 

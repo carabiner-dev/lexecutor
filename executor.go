@@ -42,7 +42,7 @@ func RunAllTestsWithRunners(t *testing.T, rootDir string, runners []VersionRunne
 	}
 
 	if len(suites) == 0 {
-		t.Fatal("no .ampel-tests.yaml files found")
+		t.Fatal("no .ptests.yaml files found")
 	}
 
 	for _, runner := range runners {
