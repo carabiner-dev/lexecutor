@@ -62,11 +62,9 @@ func RunAllTestsWithRunners(t *testing.T, rootDir string, runners []VersionRunne
 	}
 
 	for _, runner := range runners {
-		runner := runner
 		t.Run(runner.Version(), func(t *testing.T) {
 			t.Parallel()
 			for _, ds := range suites {
-				ds := ds
 				relDir, err := filepath.Rel(rootDir, ds.Dir)
 				if err != nil {
 					relDir = ds.Dir

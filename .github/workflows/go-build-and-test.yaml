@@ -19,7 +19,6 @@ jobs:
       contents: read
     outputs:
       stable: ${{ steps.versions.outputs.GO_MINOR_VERSION_STABLE }}
-      previous: ${{ steps.versions.outputs.GO_MINOR_VERSION_PREVIOUS }}
     steps:
     - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       with:
@@ -38,8 +37,9 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
+        # lexecutor depends on ampel/policyctl, which require go 1.26, so it is
+        # only tested against the latest Go release rather than the last two.
         go-version:
-          - ${{ needs.go-versions.outputs.previous }}
           - ${{ needs.go-versions.outputs.stable }}
         os:
           - ubuntu-latest

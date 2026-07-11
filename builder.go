@@ -4,6 +4,7 @@
 package lexecutor
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -38,7 +39,7 @@ type AmpelBinaries struct {
 // Cleanup removes the temporary directory with the binaries.
 func (b *AmpelBinaries) Cleanup() {
 	if b.dir != "" {
-		os.RemoveAll(b.dir)
+		_ = os.RemoveAll(b.dir) //nolint:errcheck // best-effort cleanup of the temp dir
 	}
 }
 
@@ -83,7 +84,8 @@ func GetAmpelBinaries() (*AmpelBinaries, error) {
 
 // listReleaseTags uses gh CLI to list stable release tags, sorted descending.
 func listReleaseTags() ([]string, error) {
-	out, err := exec.Command(
+	out, err := exec.CommandContext(
+		context.Background(),
 		"gh", "release", "list",
 		"-R", defaultAmpelOwner+"/"+defaultAmpelName,
 		"--exclude-drafts", "--exclude-pre-releases",
@@ -116,9 +118,10 @@ func downloadReleaseBinary(tag, outputPath string) error {
 	if err != nil {
 		return err
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }() //nolint:errcheck // best-effort cleanup of the temp dir
 
-	cmd := exec.Command(
+	cmd := exec.CommandContext(
+		context.Background(),
 		"gh", "release", "download", tag,
 		"-R", defaultAmpelOwner+"/"+defaultAmpelName,
 		"-p", assetName,
@@ -146,7 +149,7 @@ func buildAmpelBinaries(stableTag, eolTag string) (*AmpelBinaries, error) {
 	bins := &AmpelBinaries{dir: dir, StableTag: stableTag, EOLTag: eolTag}
 	cloneDir := filepath.Join(dir, "ampel")
 	binDir := filepath.Join(dir, "bin")
-	if err := os.MkdirAll(binDir, 0o755); err != nil {
+	if err := os.MkdirAll(binDir, 0o750); err != nil {
 		bins.Cleanup()
 		return nil, err
 	}
@@ -184,8 +187,8 @@ func buildAtTag(repoDir, tag, outputPath string) error {
 	return nil
 }
 
-func runCmd(dir string, name string, args ...string) error {
-	cmd := exec.Command(name, args...)
+func runCmd(dir, name string, args ...string) error {
+	cmd := exec.CommandContext(context.Background(), name, args...)
 	cmd.Dir = dir
 	cmd.Stderr = os.Stderr
 	return cmd.Run()
