@@ -71,8 +71,8 @@ func (b *BinaryRunner) Version() string { return b.Name }
 // binaries that predate the flag return false.
 func (b *BinaryRunner) SupportsRuntimeRequirements(ctx context.Context) bool {
 	b.skipOnce.Do(func() {
-		out, _ := exec.CommandContext(ctx, b.BinaryPath, "verify", "--help").CombinedOutput()
-		b.skipSupported = strings.Contains(string(out), "--skip-unsupported-runtime")
+		out, err := exec.CommandContext(ctx, b.BinaryPath, "verify", "--help").CombinedOutput()
+		b.skipSupported = err == nil && strings.Contains(string(out), "--skip-unsupported-runtime")
 	})
 	return b.skipSupported
 }
@@ -89,6 +89,7 @@ func (b *BinaryRunner) RunTest(ctx context.Context, baseDir string, tc *tester.T
 	if err != nil {
 		result.Actual = "ERROR"
 		result.Error = err
+		//nolint:nilerr // the exec error is reported through result.Error, not the top-level return
 		return result, nil
 	}
 

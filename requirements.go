@@ -37,7 +37,8 @@ func policyRequiredPlugins(policyPath string) (map[string]string, error) {
 // policyRuntimes returns every runtime specifier declared by a policy: the
 // policy-level default plus each tenet's own runtime.
 func policyRuntimes(p *papi.Policy) []string {
-	runtimes := []string{p.GetMeta().GetRuntime()}
+	runtimes := make([]string, 0, 1+len(p.GetTenets()))
+	runtimes = append(runtimes, p.GetMeta().GetRuntime())
 	for _, t := range p.GetTenets() {
 		runtimes = append(runtimes, t.GetRuntime())
 	}
