@@ -3,8 +3,9 @@ module github.com/carabiner-dev/lexecutor
 go 1.26.3
 
 require (
+	github.com/carabiner-dev/policy v0.4.7
 	github.com/carabiner-dev/policyctl v0.1.0
-	golang.org/x/mod v0.36.0
+	golang.org/x/mod v0.38.0
 )
 
 require (
@@ -29,7 +30,6 @@ require (
 	github.com/carabiner-dev/jsonl v0.2.1 // indirect
 	github.com/carabiner-dev/openeox v1.0.0-pre.1 // indirect
 	github.com/carabiner-dev/osv v0.0.0-20250124012120-b8ce4531cd92 // indirect
-	github.com/carabiner-dev/policy v0.4.7 // indirect
 	github.com/carabiner-dev/predicates v0.1.0 // indirect
 	github.com/carabiner-dev/sbomfs v0.1.0 // indirect
 	github.com/carabiner-dev/signer v0.4.5 // indirect
