@@ -132,6 +132,19 @@ func (b *BinaryRunner) exec(ctx context.Context, baseDir string, tc *tester.Test
 		args = append(args, "-a", resolve(att))
 	}
 
+	// Collectors (resolve fs: paths relative to the test dir)
+	for _, col := range tc.Collectors {
+		if moniker, rest, ok := strings.Cut(col, ":"); ok && moniker == "fs" && rest != "" && !filepath.IsAbs(rest) {
+			col = moniker + ":" + resolve(rest)
+		}
+		args = append(args, "-c", col)
+	}
+
+	// Signer identities
+	for _, signer := range tc.Signers {
+		args = append(args, "--signer", signer)
+	}
+
 	// Context values as -x key:value
 	for _, cv := range tc.Context {
 		args = append(args, "-x", fmt.Sprintf("%s:%v", cv.Name, cv.Value))
