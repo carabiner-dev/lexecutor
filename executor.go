@@ -85,6 +85,16 @@ func RunAllTestsWithRunners(t *testing.T, rootDir string, runners []VersionRunne
 								t.Skipf("%s cannot provide plugins required by %s: %v", runner.Version(), tc.Policy, required)
 							}
 
+							// Skip tests that build their evidence with a
+							// collector on runners that can't synthesize it
+							// (e.g. a released binary whose collector predates
+							// the feature). Such a runner returns no
+							// attestations, which would surface as a spurious
+							// failure rather than a skip.
+							if len(tc.Collectors) > 0 && !runner.SupportsCollectors(t.Context()) {
+								t.Skipf("%s cannot run collector-based test %q (collectors: %v)", runner.Version(), tc.Name, tc.Collectors)
+							}
+
 							result, err := runner.RunTest(t.Context(), ds.Dir, &tc)
 							if err != nil {
 								t.Fatalf("runner error: %v", err)

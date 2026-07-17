@@ -28,6 +28,13 @@ type VersionRunner interface {
 	// than fail with an undefined-function error. Tests whose policy declares
 	// plugin requirements are skipped on runners that return false.
 	SupportsRuntimeRequirements(ctx context.Context) bool
+
+	// SupportsCollectors reports whether this runner can execute test cases that
+	// declare `collectors:` — i.e. whether it can synthesize evidence (such as
+	// signature attestations built from sigstore bundles or detached
+	// signatures) by running a collector. Tests that declare collectors are
+	// skipped on runners that return false.
+	SupportsCollectors(ctx context.Context) bool
 }
 
 // HeadRunner uses the current (HEAD) ampel version via the Go library.
@@ -45,6 +52,11 @@ func (h *HeadRunner) RunTest(ctx context.Context, baseDir string, tc *tester.Tes
 // is the current development tree, which carries every plugin the policies in
 // this repository target.
 func (h *HeadRunner) SupportsRuntimeRequirements(context.Context) bool { return true }
+
+// SupportsCollectors is always true for HEAD: the library under test is the
+// current development tree, which carries the collector features the tests in
+// this repository target.
+func (h *HeadRunner) SupportsCollectors(context.Context) bool { return true }
 
 // BinaryRunner shells out to an ampel binary for verification.
 // This avoids Go module dependency conflicts when testing against
@@ -76,6 +88,19 @@ func (b *BinaryRunner) SupportsRuntimeRequirements(ctx context.Context) bool {
 	})
 	return b.skipSupported
 }
+
+// SupportsCollectors reports whether this ampel binary can run collector-based
+// tests. Such tests need the binary's collector to synthesize the evidence
+// (e.g. build a signature attestation from a sigstore bundle or a detached
+// certificate + signature pair), and a binary whose collector predates that
+// support silently returns no attestations, which surfaces as a spurious
+// failure rather than a skip.
+//
+// Unlike plugin requirements, that capability has no CLI signal to probe (the
+// --collector and --signer flags long predate it), so released binaries are
+// gated out and collector-based tests run against HEAD only. Once binaries
+// advertise the capability, probe for it here instead of returning false.
+func (b *BinaryRunner) SupportsCollectors(context.Context) bool { return false }
 
 func (b *BinaryRunner) RunTest(ctx context.Context, baseDir string, tc *tester.TestCase) (*tester.TestResult, error) {
 	start := time.Now()
