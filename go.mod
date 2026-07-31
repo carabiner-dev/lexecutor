@@ -22,7 +22,7 @@ require (
 	github.com/avast/retry-go/v4 v4.7.0 // indirect
 	github.com/blang/semver v3.5.1+incompatible // indirect
 	github.com/blang/semver/v4 v4.0.0 // indirect
-	github.com/carabiner-dev/ampel v1.3.1 // indirect
+	github.com/carabiner-dev/ampel v1.3.6 // indirect
 	github.com/carabiner-dev/attestation v0.2.1 // indirect
 	github.com/carabiner-dev/collector v0.3.10 // indirect
 	github.com/carabiner-dev/command v0.3.1 // indirect
@@ -85,7 +85,7 @@ require (
 	github.com/goccy/go-json v0.10.6 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang/groupcache v0.0.0-20241129210726-2c02b8208cf8 // indirect
-	github.com/google/cel-go v0.28.1 // indirect
+	github.com/google/cel-go v0.30.0 // indirect
 	github.com/google/certificate-transparency-go v1.3.3 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
 	github.com/google/go-containerregistry v0.21.7 // indirect
