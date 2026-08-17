@@ -5,7 +5,7 @@ go 1.26.5
 require (
 	github.com/carabiner-dev/policy v0.5.2
 	github.com/carabiner-dev/policyctl v0.1.1-0.20260717054049-f32d907a4a77
-	golang.org/x/mod v0.38.0
+	golang.org/x/mod v0.40.0
 )
 
 require (
