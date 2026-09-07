@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"os/exec"
 	"path/filepath"
+	"runtime/debug"
 	"strings"
 	"sync"
 	"time"
@@ -21,6 +22,13 @@ import (
 type VersionRunner interface {
 	Version() string
 	RunTest(ctx context.Context, baseDir string, tc *tester.TestCase) (*tester.TestResult, error)
+
+	// EngineVersion returns the semantic version of the ampel engine this
+	// runner executes (e.g. "v1.3.7"), or "" when it can't be determined.
+	// It is compared against a test case's ampel-version floor: tests that
+	// need a newer engine are skipped on this runner. An unknown version
+	// runs every test.
+	EngineVersion() string
 
 	// SupportsRuntimeRequirements reports whether this ampel understands policy
 	// runtime/plugin requirements, i.e. it will run a policy that declares them
@@ -37,10 +45,45 @@ type VersionRunner interface {
 	SupportsCollectors(ctx context.Context) bool
 }
 
+// ampelModule is the module whose linked version identifies the HEAD engine.
+const ampelModule = "github.com/carabiner-dev/ampel"
+
 // HeadRunner uses the current (HEAD) ampel version via the Go library.
-type HeadRunner struct{}
+type HeadRunner struct {
+	// versionOnce guards the one-time build info lookup.
+	versionOnce sync.Once
+	// version caches the ampel module version linked into the binary.
+	version string
+}
 
 func (h *HeadRunner) Version() string { return "HEAD" }
+
+// EngineVersion returns the version of the ampel module linked into the test
+// binary as recorded in its build info: a release tag such as "v1.3.6", or a
+// pseudo-version for an untagged commit. It returns "" when there is no build
+// info or the module isn't linked, and "(devel)" when a replace directive
+// points at a local checkout. TestCase.RunsOn treats both as unknown, so
+// version-floored tests still run against them.
+func (h *HeadRunner) EngineVersion() string {
+	h.versionOnce.Do(func() {
+		info, ok := debug.ReadBuildInfo()
+		if !ok {
+			return
+		}
+		for _, dep := range info.Deps {
+			if dep.Path != ampelModule {
+				continue
+			}
+			if dep.Replace != nil {
+				h.version = dep.Replace.Version
+				return
+			}
+			h.version = dep.Version
+			return
+		}
+	})
+	return h.version
+}
 
 func (h *HeadRunner) RunTest(ctx context.Context, baseDir string, tc *tester.TestCase) (*tester.TestResult, error) {
 	runner := tester.NewRunner(baseDir)
@@ -65,6 +108,11 @@ type BinaryRunner struct {
 	// Name is the version label shown in test output (e.g. "stable", "eol").
 	Name string
 
+	// Tag is the ampel release tag the binary was built from (e.g. "v1.3.7").
+	// It is the engine version compared against a test case's ampel-version
+	// floor. Leave empty when unknown; the runner then runs every test.
+	Tag string
+
 	// BinaryPath is the path to the ampel binary to invoke.
 	BinaryPath string
 
@@ -75,6 +123,9 @@ type BinaryRunner struct {
 }
 
 func (b *BinaryRunner) Version() string { return b.Name }
+
+// EngineVersion returns the release tag the binary was built from.
+func (b *BinaryRunner) EngineVersion() string { return b.Tag }
 
 // SupportsRuntimeRequirements probes (once) whether the binary advertises the
 // --skip-unsupported-runtime verify flag. Presence of that flag is our signal

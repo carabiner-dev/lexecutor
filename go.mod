@@ -1,10 +1,10 @@
 module github.com/carabiner-dev/lexecutor
 
-go 1.26.5
+go 1.27.0
 
 require (
 	github.com/carabiner-dev/policy v0.5.3
-	github.com/carabiner-dev/policyctl v0.1.1-0.20260717054049-f32d907a4a77
+	github.com/carabiner-dev/policyctl v0.1.1
 	golang.org/x/mod v0.40.0
 )
 
