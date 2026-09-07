@@ -22,8 +22,8 @@ func RunAllTests(t *testing.T, rootDir string) {
 	} else {
 		t.Cleanup(bins.Cleanup)
 		runners = append(runners,
-			&BinaryRunner{Name: "stable (" + bins.StableTag + ")", BinaryPath: bins.Stable},
-			&BinaryRunner{Name: "eol (" + bins.EOLTag + ")", BinaryPath: bins.EOL},
+			&BinaryRunner{Name: "stable (" + bins.StableTag + ")", Tag: bins.StableTag, BinaryPath: bins.Stable},
+			&BinaryRunner{Name: "eol (" + bins.EOLTag + ")", Tag: bins.EOLTag, BinaryPath: bins.EOL},
 		)
 	}
 
@@ -75,6 +75,14 @@ func RunAllTestsWithRunners(t *testing.T, rootDir string, runners []VersionRunne
 						tc := ds.Suite.Tests[i]
 						t.Run(tc.Name, func(t *testing.T) {
 							t.Parallel()
+
+							// Skip tests that declare an ampel-version floor
+							// newer than this runner's engine (e.g. behavior
+							// that only shipped in a later release). Runners
+							// with an unknown engine version run everything.
+							if engine := runner.EngineVersion(); !tc.RunsOn(engine) {
+								t.Skipf("%s: ampel %s is older than the %s floor declared by %q", runner.Version(), engine, tc.AmpelVersion, tc.Name)
+							}
 
 							// Skip tests whose policy needs plugins this runner
 							// can't provide (e.g. an older binary that predates

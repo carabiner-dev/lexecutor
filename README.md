@@ -77,6 +77,7 @@ tests:
         value: high
     context-files:                         # optional context providers
       - path: ../testdata/context.json
+    ampel-version: v1.3.7                  # optional: minimum ampel version
 ```
 
 ## Runtime requirements and version skipping
@@ -104,6 +105,32 @@ a spurious failure:
   before it runs.
 
 Policies with no plugin requirements run on every runner, unchanged.
+
+## Version floors: `ampel-version`
+
+Some behavior changes with the ampel release rather than with a plugin, for
+example a bug fix in a bundled library that flips a policy's verdict. A test
+case can declare the minimum ampel version it needs:
+
+```yaml
+  - name: producers-passes-with-cyclonedx-suppliers
+    policy: protobom-sbom-producers.hjson
+    ampel-version: v1.3.7
+    expect: PASS
+```
+
+`lexecutor` compares that floor against each runner's engine version and
+**skips** the test on older engines instead of failing it:
+
+- `stable` / `eol` report the release tag their binary was built from.
+- `HEAD` reports the ampel module version linked into the test binary, read
+  from its build info. Pseudo-versions compare as semver, so a build of a
+  commit between two tags sorts between them. When the version is unknown
+  (for example a `replace` directive pointing at a local checkout reports
+  `(devel)`), `HEAD` runs every test.
+
+Since `eol` is always the second most recent release, a floored test starts
+running on both released binaries as soon as the next ampel version ships.
 
 ## License
 
