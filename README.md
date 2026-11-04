@@ -136,7 +136,7 @@ running on both released binaries as soon as the next ampel version ships.
 
 Apache-2.0. See [LICENSE](./LICENSE).
 
-[ampel]: https://github.com/carabiner-dev/ampel
+[ampel]: https://github.com/policylabs/ampel
 [policies]: https://github.com/carabiner-dev/policies
 [policyctl]: https://github.com/carabiner-dev/policyctl
 [gh]: https://cli.github.com/

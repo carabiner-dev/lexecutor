@@ -17,8 +17,8 @@ import (
 )
 
 const (
-	defaultAmpelRepo  = "https://github.com/carabiner-dev/ampel.git"
-	defaultAmpelOwner = "carabiner-dev"
+	defaultAmpelRepo  = "https://github.com/policylabs/ampel.git"
+	defaultAmpelOwner = "policylabs"
 	defaultAmpelName  = "ampel"
 )
 
