@@ -8,8 +8,8 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/carabiner-dev/policy"
-	papi "github.com/carabiner-dev/policy/api/v1"
+	"github.com/policylabs/policy"
+	papi "github.com/policylabs/policy/api/v1"
 )
 
 // policyRequiredPlugins compiles the policy at policyPath and returns the union

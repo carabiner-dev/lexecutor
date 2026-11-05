@@ -46,7 +46,7 @@ type VersionRunner interface {
 }
 
 // ampelModule is the module whose linked version identifies the HEAD engine.
-const ampelModule = "github.com/carabiner-dev/ampel"
+const ampelModule = "github.com/policylabs/ampel"
 
 // HeadRunner uses the current (HEAD) ampel version via the Go library.
 type HeadRunner struct {
